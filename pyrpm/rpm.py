@@ -13,6 +13,7 @@ try:
 except:
     from StringIO import StringIO
 
+from collections import namedtuple
 import struct
 import re
 
@@ -209,6 +210,9 @@ class RPMError(BaseException):
     pass
 
 
+RPMFile = namedtuple("RPMFile", ['name', 'size', 'mode', 'rdevice', 'device', 'time', 'digest', 'link_to', 'flags', 'username', 'group', 'verify_flags', 'language', 'inode', 'color', 'content_class'])
+RPMChangeLog = namedtuple("RPMChangeLog", ['name', 'text', 'time'])
+
 class RPM(object):
     RPM_LEAD_MAGIC_NUMBER = '\xed\xab\xee\xdb'
     
@@ -225,10 +229,13 @@ class RPM(object):
         self.source = None
         self.header = None
         self.signature = None
+        self.filelist = []
+        self.changelog = []
         
         self._read_lead()
         self._read_signature()
         self._read_header()
+        self._match_composite()
 
 
     def _read_lead(self):
@@ -303,3 +310,29 @@ class RPM(object):
                 string += byte
         return False
 
+
+    def _match_composite(self):
+        for idx, name in enumerate(self.header[1117]):
+            self.filelist.append(RPMFile(
+                name=self.header[1118][self.header[1116][idx]]+name,
+                size=self.header[1028][idx],
+                mode=self.header[1030][idx],
+                rdevice=self.header[1033][idx],
+                time=self.header[1034][idx],
+                digest=self.header[1035][idx],
+                link_to=self.header[1036][idx],
+                flags = self.header[1037][idx],
+                username = self.header[1039][idx],
+                group = self.header[1040][idx],
+                verify_flags=self.header[1045][idx],
+                device=self.header[1095][idx],
+                inode=self.header[1096][idx],
+                language=self.header[1097][idx],
+                color=self.header[1140][idx],
+                content_class=self.header[1142][self.header[1141][idx]]))
+        
+        for idx, name in enumerate(self.header[1081]):
+            self.changelog.append(RPMChangeLog(
+                name=name,
+                time=self.header[1080][idx],
+                text=self.header[1082][idx]))
