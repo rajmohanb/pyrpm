@@ -14,8 +14,10 @@ except:
     from StringIO import StringIO
 
 from collections import namedtuple
+import stat
 import struct
 import re
+import hashlib
 
 class Entry(object):
     ''' RPM Header Entry '''
@@ -56,7 +58,8 @@ class Entry(object):
     def _read_format(self, fmt, store):
         size = struct.calcsize(fmt)
         data = store.read(size)
-        return struct.unpack(fmt, data)
+        unpacked_data = struct.unpack(fmt, data)
+        return unpacked_data[0] if len(unpacked_data) == 1 else unpacked_data
 
     
     def _read_null(self, store, data_count):
@@ -158,7 +161,8 @@ class HeaderBase(object):
 
     def __getattr__(self, name):
         if name in self.TAGS:
-            return self[self.TAGS[name]]
+            id, default = self.TAGS[name]
+            return self[id] if self[id] else default
         
         raise AttributeError(name)
 
@@ -177,32 +181,32 @@ class HeaderBase(object):
 # singature header section
 class Signature(HeaderBase):
     TAGS = {
-        'size': 1000,
-        'pgp': 1002,
-        'md5': 1004,
-        'gpg': 1005,
-        'pgp5': 1006,
-        'payload_size': 1007,
+        'size': (1000, -1),
+        'pgp': (1002, ""),
+        'md5': (1004, ""),
+        'gpg': (1005, ""),
+        'pgp5': (1006, ""),
+        'payload_size': (1007, -1),
     }
 
 
 # primary header section
 class Header(HeaderBase):
     TAGS = {
-        'name': 1000,
-        'version': 1001,
-        'release': 1002,
-        'epoch': 1003,
-        'summary': 1004,
-        'description': 1005,
-        'copyright': 1014,
-        'url': 1020,
-        'architecture': 1022,
-        'source_rpm': 1044,
-        'provides': 1047,
-        'requires': 1049,
-        'conflicts': 1054,
-        'platform': 1132,
+        'name': (1000, ""),
+        'version': (1001, "0.1"),
+        'release': (1002, ""),
+        'epoch': (1003, 0),
+        'summary': (1004, ""),
+        'description': (1005, ""),
+        'copyright': (1014, ""),
+        'url': (1020, ""),
+        'architecture': (1022, ""),
+        'source_rpm': (1044, ""),
+        'provides': (1047, []),
+        'requires': (1049, []),
+        'conflicts': (1054, []),
+        'platform': (1132, ""),
     }
 
 
@@ -210,7 +214,7 @@ class RPMError(BaseException):
     pass
 
 
-RPMFile = namedtuple("RPMFile", ['name', 'size', 'mode', 'rdevice', 'device', 'time', 'digest', 'link_to', 'flags', 'username', 'group', 'verify_flags', 'language', 'inode', 'color', 'content_class'])
+RPMFile = namedtuple("RPMFile", ['name', 'size', 'mode', 'rdevice', 'device', 'time', 'digest', 'link_to', 'flags', 'username', 'group', 'verify_flags', 'language', 'inode', 'color', 'content_class', 'type', 'primary'])
 RPMChangeLog = namedtuple("RPMChangeLog", ['name', 'text', 'time'])
 
 class RPM(object):
@@ -236,6 +240,7 @@ class RPM(object):
         self._read_signature()
         self._read_header()
         self._match_composite()
+        self._compute_checksum()
 
 
     def _read_lead(self):
@@ -313,8 +318,9 @@ class RPM(object):
 
     def _match_composite(self):
         for idx, name in enumerate(self.header[1117]):
+            dirname = self.header[1118][self.header[1116][idx]]
             self.filelist.append(RPMFile(
-                name=self.header[1118][self.header[1116][idx]]+name,
+                name=dirname+name,
                 size=self.header[1028][idx],
                 mode=self.header[1030][idx],
                 rdevice=self.header[1033][idx],
@@ -329,10 +335,23 @@ class RPM(object):
                 inode=self.header[1096][idx],
                 language=self.header[1097][idx],
                 color=self.header[1140][idx],
-                content_class=self.header[1142][self.header[1141][idx]]))
+                content_class=self.header[1142][self.header[1141][idx]],
+                type='dir' if stat.S_ISDIR(self.header[1030][idx]) else ('ghost' if (self.header[1037][idx] & 64) else 'file'),
+                primary=('bin/' in dirname or dirname.startswith('/etc/'))))
         
-        for idx, name in enumerate(self.header[1081]):
-            self.changelog.append(RPMChangeLog(
-                name=name,
-                time=self.header[1080][idx],
-                text=self.header[1082][idx]))
+        if self.header[1081]:
+            for idx, name in enumerate(self.header[1081]):
+                self.changelog.append(RPMChangeLog(
+                    name=name,
+                    time=self.header[1080][idx],
+                    text=self.header[1082][idx]))
+    
+    
+    def _compute_checksum(self):
+        self.rpmfile.seek(0)
+        m = hashlib.sha256()
+        data = self.rpmfile.read()
+        while data:
+            m.update(data)
+            data = self.rpmfile.read()
+        self.checksum = m.hexdigest()
