@@ -199,10 +199,17 @@ class Header(HeaderBase):
         'epoch': (1003, 0),
         'summary': (1004, ""),
         'description': (1005, ""),
-        'copyright': (1014, ""),
+        'build_time': (1006, 0),
+        'build_host': (1007, ""),
+        'size': (1009, 0),
+        'vendor': (1011, ""),
+        'license': (1014, ""),
+        'packager': (1015, ""),
+        'group': (1016, []),
         'url': (1020, ""),
         'architecture': (1022, ""),
         'source_rpm': (1044, ""),
+        'archive_size': (1046, 0),
         'provides': (1047, []),
         'requires': (1049, []),
         'conflicts': (1054, []),
@@ -216,9 +223,12 @@ class RPMError(BaseException):
 
 RPMFile = namedtuple("RPMFile", ['name', 'size', 'mode', 'rdevice', 'device', 'time', 'digest', 'link_to', 'flags', 'username', 'group', 'verify_flags', 'language', 'inode', 'color', 'content_class', 'type', 'primary'])
 RPMChangeLog = namedtuple("RPMChangeLog", ['name', 'text', 'time'])
+RPMprco = namedtuple("RPMprco", ['name', 'version', 'flags', 'str_flags'])
+
 
 class RPM(object):
     RPM_LEAD_MAGIC_NUMBER = '\xed\xab\xee\xdb'
+    RPM_PRCO_FLAGS_MAP = { 0: None, 2: 'LT', 4: 'GT', 8: 'EQ', 10: 'LE', 12: 'GE' }
     
 
     def __init__(self, rpm):
@@ -235,6 +245,11 @@ class RPM(object):
         self.signature = None
         self.filelist = []
         self.changelog = []
+        
+        self.provides = []
+        self.requires = []
+        self.obsoletes = []
+        self.conflicts = []
         
         self._read_lead()
         self._read_signature()
@@ -317,6 +332,7 @@ class RPM(object):
 
 
     def _match_composite(self):
+        # files
         for idx, name in enumerate(self.header[1117]):
             dirname = self.header[1118][self.header[1116][idx]]
             self.filelist.append(RPMFile(
@@ -339,12 +355,30 @@ class RPM(object):
                 type='dir' if stat.S_ISDIR(self.header[1030][idx]) else ('ghost' if (self.header[1037][idx] & 64) else 'file'),
                 primary=('bin/' in dirname or dirname.startswith('/etc/'))))
         
+        # changelog
         if self.header[1081]:
-            for idx, name in enumerate(self.header[1081]):
-                self.changelog.append(RPMChangeLog(
-                    name=name,
-                    time=self.header[1080][idx],
-                    text=self.header[1082][idx]))
+            for name, time, text in zip(self.header[1081], self.header[1080], self.header[1082]):
+                self.changelog.append(RPMChangeLog(name=name, time=time, text=text))
+        
+        # provides
+        if self.header[1047]:
+            for name, flags, version in zip(self.header[1047], self.header[1112], self.header[1113]):
+                self.provides.append(RPMprco(name=name, flags=flags, str_flags=self.RPM_PRCO_FLAGS_MAP[flags & 0xf], version=self._stringToVersion(version)))
+        
+        # requires
+        if self.header[1049]:
+            for name, flags, version in zip(self.header[1049], self.header[1048], self.header[1050]):
+                self.requires.append(RPMprco(name=name, flags=flags, str_flags=self.RPM_PRCO_FLAGS_MAP[flags & 0xf], version=self._stringToVersion(version)))
+        
+        # obsoletes
+        if self.header[1090]:
+            for name, flags, version in zip(self.header[1090], self.header[1114], self.header[1115]):
+                self.obsoletes.append(RPMprco(name=name, flags=flags, str_flags=self.RPM_PRCO_FLAGS_MAP[flags & 0xf], version=self._stringToVersion(version)))
+        
+        # conflicts
+        if self.header[1054]:
+            for name, flags, version in zip(self.header[1054], self.header[1053], self.header[1055]):
+                self.conflicts.append(RPMprco(name=name, flags=flags, str_flags=self.RPM_PRCO_FLAGS_MAP[flags & 0xf], version=self._stringToVersion(version)))
     
     
     def _compute_checksum(self):
@@ -355,3 +389,31 @@ class RPM(object):
             m.update(data)
             data = self.rpmfile.read()
         self.checksum = m.hexdigest()
+    
+    def _stringToVersion(self, verstring):
+        if verstring in [None, '']:
+            return (None, None, None)
+        i = verstring.find(':')
+        if i != -1:
+            try:
+                epoch = str(long(verstring[:i]))
+            except ValueError:
+                # look, garbage in the epoch field, how fun, kill it
+                epoch = '0' # this is our fallback, deal
+        else:
+            epoch = '0'
+        j = verstring.find('-')
+        if j != -1:
+            if verstring[i + 1:j] == '':
+                version = None
+            else:
+                version = verstring[i + 1:j]
+            release = verstring[j + 1:]
+        else:
+            if verstring[i + 1:] == '':
+                version = None
+            else:
+                version = verstring[i + 1:]
+            release = None
+        return (epoch, version, release)
+
