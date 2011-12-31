@@ -106,7 +106,7 @@ class Entry(object):
             if char[0] == '\x00': # read until '\0'
                 break
             string += char[0]
-        return string
+        return string.decode('utf-8')
 
     
     def _read_string_array(self, store, data_count):
@@ -389,6 +389,7 @@ class RPM(object):
             m.update(data)
             data = self.rpmfile.read()
         self.checksum = m.hexdigest()
+    
     
     def _stringToVersion(self, verstring):
         if verstring in [None, '']:
