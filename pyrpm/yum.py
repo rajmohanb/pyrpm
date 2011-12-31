@@ -1,3 +1,5 @@
+from xml.etree.ElementTree import Element
+
 from rpm import RPM
 
 #################
@@ -22,84 +24,60 @@ def to_xml(item, attrib=False):
 # Real classes
 #################
 class YumPackage(RPM):  
-    def _dump_base_items(self):
-        return u"""
-\t<name>%(name)s</name>
-\t<arch>%(arch)s</arch>
-\t<version epoch="%(epoch)s" ver="%(ver)s" rel="%(rel)s"/>
-\t<checksum type="%(csum_type)s" pkgid="YES">%(csum)s</checksum>
-\t<summary>%(summary)s</summary>
-\t<description>%(description)s</description>
-\t<packager>%(packager)s</packager>
-\t<url>%(url)s</url>
-\t<time file="%(filetime)s" build="%(buildtime)s"/>
-\t<size package="%(packagesize)s" installed="%(installedsize)s" archive="%(archivesize)s"/>
-\t<location xml:base="%(location_base)s" href="%(location_href)s"/>
-""" % { 'name': self.header.name,
-        'arch': self.header.architecture,
-        'epoch': self.header.epoch,
-        'ver': self.header.version,
-        'rel': self.header.release,
-        'csum_type': 'sha256',
-        'csum': self.checksum,
-        'summary': to_xml(self.header.summary),
-        'description': to_xml(self.header.description),
-        'packager': self.header.packager,
-        'url': self.header.url,
-        'filetime': 0,
-        'buildtime': self.header.build_time,
-        'packagesize': self.header.size,
-        'installedsize': sum([file.size for file in self.filelist]),
-        'archivesize': self.header.archive_size,
-        'location_base': "",
-        'location_href': ""}
+    def _xml_base_items(self, element):
+        element.append(Element('{http://linux.duke.edu/metadata/common}name', text=self.header.name))
+        element.append(Element('{http://linux.duke.edu/metadata/common}arch', text=self.header.architecture))
+        element.append(Element("{http://linux.duke.edu/metadata/common}version", {'epoch': str(self.header.epoch), 'ver': self.header.version, 'rel': self.header.release}))
+        element.append(Element('{http://linux.duke.edu/metadata/common}checksum', {'type': 'sha256', 'pkgid': 'YES'}, text=self.checksum))
+        element.append(Element('{http://linux.duke.edu/metadata/common}summary', text=self.header.summary))
+        element.append(Element('{http://linux.duke.edu/metadata/common}description', text=self.header.description))
+        element.append(Element('{http://linux.duke.edu/metadata/common}packager', text=self.header.packager))
+        element.append(Element('{http://linux.duke.edu/metadata/common}url', text=self.header.url))
+        element.append(Element('{http://linux.duke.edu/metadata/common}time', {'file': '0', 'build': str(self.header.build_time)}))
+        element.append(Element('{http://linux.duke.edu/metadata/common}size', {'package': str(self.header.size), 'installed': str(sum([file.size for file in self.filelist])), 'archive': str(self.header.archive_size)}))
+        element.append(Element('{http://linux.duke.edu/metadata/common}location', {'href':''}))
+    
 
-    def _dump_format_items(self):
-        msg = """\t<format>
-\t\t<rpm:license>%(license)s</rpm:license>
-\t\t<rpm:vendor>%(vendor)s</rpm:vendor>
-\t\t<rpm:group>%(group)s</rpm:group>
-\t\t<rpm:buildhost>%(buildhost)s</rpm:buildhost>
-\t\t<rpm:sourcerpm>%(sourcerpm)s</rpm:sourcerpm>
-""" % {
-        'license': to_xml(self.header.license),
-        'vendor': to_xml(self.header.vendor),
-        'group': to_xml(self.header.group),
-        'buildhost': to_xml(self.header.build_host),
-        'sourcerpm': to_xml(self.header.source_rpm)}
+    def _xml_format_items(self, element):
+        ef = Element('{http://linux.duke.edu/metadata/common}format')
+        ef.append(Element('{http://linux.duke.edu/metadata/rpm}license', text=self.header.license))
+        ef.append(Element('{http://linux.duke.edu/metadata/rpm}vendor', text=self.header.vendor))
+        ef.append(Element('{http://linux.duke.edu/metadata/rpm}group', text=self.header.group))
+        ef.append(Element('{http://linux.duke.edu/metadata/rpm}buildhost', text=self.header.build_host))
+        ef.append(Element('{http://linux.duke.edu/metadata/rpm}sourcerpm', text=self.header.source_rpm))
         
-        msg += self._dump_pco('provides')
-        msg += self._dump_requires()
-        msg += self._dump_pco('conflicts')         
-        msg += self._dump_pco('obsoletes')         
-        msg += self._dump_files(True)
-        msg += """\t</format>"""
+        self._xml_pco(ef, 'provides')
+        self._xml_requires(ef)
+        self._xml_pco(ef, 'conflicts')         
+        self._xml_pco(ef, 'obsoletes')         
+        self._xml_files(ef, True)
         
-        return msg
+        element.append(ef)
 
-    def _dump_pco(self, pcotype):
-        msg = ""
+
+    def _xml_pco(self, element, pcotype):
+        # get right pco
         mylist = getattr(self, pcotype)
-        if mylist: msg = "\n\t\t<rpm:%s>\n" % pcotype
+        if not mylist:
+            return
+        
+        ef = Element('{http://linux.duke.edu/metadata/rpm}' + pcotype)
         for prco in sorted(mylist):
-            pcostring = '''\t\t\t<rpm:entry name="%s"''' % to_xml(prco.name, attrib=True)
+            entry = Element('{http://linux.duke.edu/metadata/rpm}entry', {'name': prco.name})
             if prco.str_flags:
-                pcostring += ''' flags="%s"''' % to_xml(prco.str_flags, attrib=True)
+                entry.set('flags', prco.str_flags)
                 e,v,r = prco.version
                 if e:
-                    pcostring += ''' epoch="%s"''' % to_xml(e, attrib=True)
+                    entry.set('epoch', str(e))
                 if v:
-                    pcostring += ''' ver="%s"''' % to_xml(v, attrib=True)
+                    entry.set('ver', v)
                 if r:
-                    pcostring += ''' rel="%s"''' % to_xml(r, attrib=True)
-            pcostring += "/>\n"
-            msg += pcostring
-            
-        if mylist: msg += "\t\t</rpm:%s>\n" % pcotype
-        return msg
+                    entry.set('rel', r)
+            ef.append(entry)
+        element.append(ef)
     
     
-    def _dump_files(self, primary=False):
+    def _xml_files(self, element, primary=False):
         # sort files
         files = {'file': [], 'dir': [], 'ghost': []}
         for file in self.filelist:
@@ -108,18 +86,19 @@ class YumPackage(RPM):
             files[file.type].append(file)
         
         # create output
-        msg = ""
-        msg += "\n".join(["""\t<file>%s</file>""" % to_xml(fn.name) for fn in sorted(files['file'])])
-        msg += "\n".join(["""\t<file type="dir">%s</file>""" % to_xml(fn.name) for fn in sorted(files['dir'])])
-        msg += "\n".join(["""\t<file type="ghost">%s</file>""" % to_xml(fn.name) for fn in sorted(files['ghost'])])
-        return msg
+        for file in sorted(files['file']):
+            element.append(Element("{http://linux.duke.edu/metadata/filelists}file", text=file.name))
+        
+        for type in ['dir', 'ghost']:
+            for file in sorted(files[type]):
+                element.append(Element("{http://linux.duke.edu/metadata/filelists}file", {'type': type}, text=file.name))
+    
 
-
-    def _dump_requires(self):
+    def _xml_requires(self, element):
         """returns deps in XML format"""
-        msg = ""
-        if self.requires: msg = "\n\t\t<rpm:requires>\n"
+        ef = Element('{http://linux.duke.edu/metadata/rpm}requires')
         used = 0
+        
         for prco in sorted(self.requires):
             if prco.name.startswith('rpmlib('):
                 continue
@@ -132,72 +111,52 @@ class YumPackage(RPM):
                     if prco in self.provides:
                         continue
             
-            prcostring = '''\t\t\t<rpm:entry name="%s"''' % to_xml(prco.name, attrib=True)
+            entry = Element('{http://linux.duke.edu/metadata/rpm}entry', {'name': prco.name})
             if prco.str_flags:
-                prcostring += ''' flags="%s"''' % to_xml(prco.str_flags, attrib=True)
-                
+                entry.set('flags', prco.str_flags)
                 e,v,r = prco.version
                 if e:
-                    prcostring += ''' epoch="%s"''' % to_xml(e, attrib=True)
+                    entry.set('epoch', str(e))
                 if v:
-                    prcostring += ''' ver="%s"''' % to_xml(v, attrib=True)
+                    entry.set('ver', v)
                 if r:
-                    prcostring += ''' rel="%s"''' % to_xml(r, attrib=True)
+                    entry.set('rel', r)
             if prco.flags & 1600:
                 prcostring += ''' pre="1"'''
-
-            prcostring += "/>\n"
-            msg += prcostring
+            
+            ef.append(entry)
             used += 1
             
-        if self.requires: msg += "\t\t</rpm:requires>\n"
-        
-        return "" if used == 0 else msg
+        if used != 0:
+            element.append(ef)
 
 
-    def _dump_changelog(self, clog_limit=0):
+    def _xml_changelog(self, element, clog_limit=0):
         if not self.changelog:
             return ""
         
         # We need to output them "backwards", so the oldest is first
         clogs = self.changelog[:clog_limit] if clog_limit else self.changelog
-        return "\n".join(["""\t<changelog author="%s" date="%d">%s</changelog>""" % (to_xml(changelog.name), changelog.time, to_xml(changelog.text)) for changelog in clogs])
+        for changelog in clogs:
+            element.append(Element('{http://linux.duke.edu/metadata/other}changelog', {'author': changelog.name, 'date': str(changelog.time)}, text=changelog.text))
 
 
-    def xml_dump_primary_metadata(self):
-        msg =  u"""<package type="rpm">"""
-        msg += self._dump_base_items()
-        msg += self._dump_format_items()
-        msg += u"""\n</package>"""
-        return msg
+    def xml_primary_metadata(self):
+        e = Element("{http://linux.duke.edu/metadata/common}package", {'type': 'rpm'})
+        self._xml_base_items(e)
+        self._xml_format_items(e)
+        return e
     
-    def xml_dump_filelists_metadata(self):
-        return u"""
-<package pkgid="%(pkgid)s" name="%(name)s" arch="%(arch)s">
-\t<version epoch="%(epoch)s" ver="%(ver)s" rel="%(rel)s"/>
-%(files)s
-</package>
-""" % {
-        'pkgid': self.checksum,
-        'name': self.header.name,
-        'arch': self.header.architecture,
-        'epoch': self.header.epoch,
-        'ver': self.header.version,
-        'rel': self.header.release,
-        'files': self._dump_files()
-}
-
-    def xml_dump_other_metadata(self, clog_limit=0):
-        return u"""
-<package pkgid="%(pkgid)s" name="%(name)s" arch="%(arch)s">
-\t<version epoch="%(epoch)d" ver="%(ver)s" rel="%(rel)s"/>
-%(changelog)s
-</package>
-""" % {
-        'pkgid': self.checksum,
-        'name': self.header.name,
-        'arch': self.header.architecture,
-        'epoch': self.header.epoch,
-        'ver': self.header.version,
-        'rel': self.header.release,
-        'changelog': self._dump_changelog(clog_limit)}
+    
+    def xml_filelists_metadata(self):
+        e = Element("{http://linux.duke.edu/metadata/filelists}package", {'pkgid': self.checksum, 'name': self.header.name, 'arch': self.header.architecture})
+        e.append(Element("{http://linux.duke.edu/metadata/filelists}version", {'epoch': str(self.header.epoch), 'ver': self.header.version, 'rel': self.header.release}))
+        self._xml_files(e)
+        return e
+    
+    
+    def xml_other_metadata(self, clog_limit=0):
+        e = Element("{http://linux.duke.edu/metadata/other}package", {'pkgid': self.checksum, 'name': self.header.name, 'arch': self.header.architecture})
+        e.append(Element("{http://linux.duke.edu/metadata/other}version", {'epoch': str(self.header.epoch), 'ver': self.header.version, 'rel': self.header.release}))
+        self._xml_changelog(e, clog_limit)
+        return e
