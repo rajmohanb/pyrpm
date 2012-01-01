@@ -2,24 +2,6 @@ from xml.etree.ElementTree import Element
 
 from rpm import RPM
 
-#################
-# Helper Methods
-#################
-
-__cached_saxutils = None
-def to_xml(item, attrib=False):
-    global __cached_saxutils
-    if __cached_saxutils is None:
-        import xml.sax.saxutils
-        __cached_saxutils = xml.sax.saxutils
-    
-    item = item.rstrip()
-    if attrib:
-        item = __cached_saxutils.escape(item, entities={'"':"&quot;"})
-    else:
-        item = __cached_saxutils.escape(item)
-    return item
-
 ##################
 # Real classes
 #################
