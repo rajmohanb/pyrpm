@@ -186,7 +186,7 @@ class YumRepository(object):
         ElementTree.register_namespace('', 'http://linux.duke.edu/metadata/repo')
         
         # write it out
-        tree.write(open(os.path.join(self.repodir, 'repodata/repomd1.xml'), 'wt'), encoding='utf-8', xml_declaration=True, method='xml')
+        tree.write(open(os.path.join(self.repodir, 'repodata/repomd.xml'), 'wt'), encoding='utf-8', xml_declaration=True, method='xml')
     
     
     def _add_node(self, parent, tag, attrib={}, text=None):
