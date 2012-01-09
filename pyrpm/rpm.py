@@ -23,7 +23,7 @@ class Entry(object):
     ''' RPM Header Entry '''
     
     
-    def __init__(self, entry, store):
+    def __init__(self, entry=None, store=None, tag=None, type=None, value=None):
         DECODING_MAP = {
             0: self._read_null,
             1: self._read_char,
@@ -37,14 +37,20 @@ class Entry(object):
             9: self._read_string,
         }
         
-        # seek to position in store
-        store.seek(entry[2])
-        
-        # decode information
-        self.entry = entry
-        self.tag = entry[0]
-        self.type = entry[1]
-        self.value = DECODING_MAP[entry[1]](store, entry[3])
+        # read from file if possible
+        if entry is not None and store is not None:
+            # seek to position in store
+            store.seek(entry[2])
+            
+            # decode information
+            self.entry = entry
+            self.tag = entry[0]
+            self.type = entry[1]
+            self.value = DECODING_MAP[entry[1]](store, entry[3])
+        else:
+            self.tag = tag
+            self.type = type
+            self.value = value
 
 
     def __str__(self):
@@ -141,22 +147,24 @@ class HeaderBase(object):
         '''
         self.entries = []
         
-        # read and check header
-        header = struct.unpack('!3sc4sll', file.read(16))
-        if header[0] != self.MAGIC_NUMBER:
-            raise RPMError('invalid RPM header')
-
-        # read entries and store
-        entries = [file.read(16) for i in range(header[3])]
-        store = StringIO(file.read(header[4]))
-        
-        # parse entries
-        for entry in entries:
-            parsed_entry = struct.unpack("!4l", entry)
-            object_entry = Entry(parsed_entry, store)
+        # read from file if possible
+        if file:
+            # read and check header
+            header = struct.unpack('!3sc4sll', file.read(16))
+            if header[0] != self.MAGIC_NUMBER:
+                raise RPMError('invalid RPM header')
+    
+            # read entries and store
+            entries = [file.read(16) for i in range(header[3])]
+            store = StringIO(file.read(header[4]))
             
-            if object_entry:
-                self.entries.append(object_entry)
+            # parse entries
+            for entry in entries:
+                parsed_entry = struct.unpack("!4l", entry)
+                object_entry = Entry(parsed_entry, store)
+                
+                if object_entry:
+                    self.entries.append(object_entry)
 
 
     def __getattr__(self, name):
@@ -257,6 +265,13 @@ class RPM(object):
         self._match_composite()
         self._compute_checksum()
 
+
+    @property
+    def canonical_filename(self):
+        if self.header.epoch == 0:
+            return "%s-%s-%s.%s.rpm" % (self.header.name, self.header.version, self.header.release, self.header.architecture)
+        else:
+            return "%s-%s-%s-%d.%s.rpm" % (self.header.name, self.header.version, self.header.release, self.header.epoch, self.header.architecture)
 
     def _read_lead(self):
         ''' reads the rpm lead section
