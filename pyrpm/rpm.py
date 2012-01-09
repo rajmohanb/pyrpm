@@ -170,7 +170,10 @@ class HeaderBase(object):
     def __getattr__(self, name):
         if name in self.TAGS:
             id, default = self.TAGS[name]
-            return self[id] if self[id] else default
+            try:
+                return self[id]
+            except:
+                return default
         
         raise AttributeError(name)
 
