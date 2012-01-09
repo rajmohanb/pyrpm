@@ -184,6 +184,7 @@ class HeaderBase(object):
         for entry in self:
             if entry.tag == item:
                 return entry.value
+        raise KeyError()
 
 
 # singature header section
@@ -348,52 +349,70 @@ class RPM(object):
 
     def _match_composite(self):
         # files
-        for idx, name in enumerate(self.header[1117]):
-            dirname = self.header[1118][self.header[1116][idx]]
-            self.filelist.append(RPMFile(
-                name=dirname+name,
-                size=self.header[1028][idx],
-                mode=self.header[1030][idx],
-                rdevice=self.header[1033][idx],
-                time=self.header[1034][idx],
-                digest=self.header[1035][idx],
-                link_to=self.header[1036][idx],
-                flags = self.header[1037][idx],
-                username = self.header[1039][idx],
-                group = self.header[1040][idx],
-                verify_flags=self.header[1045][idx],
-                device=self.header[1095][idx],
-                inode=self.header[1096][idx],
-                language=self.header[1097][idx],
-                color=self.header[1140][idx],
-                content_class=self.header[1142][self.header[1141][idx]],
-                type='dir' if stat.S_ISDIR(self.header[1030][idx]) else ('ghost' if (self.header[1037][idx] & 64) else 'file'),
-                primary=('bin/' in dirname or dirname.startswith('/etc/'))))
+        try:
+            for idx, name in enumerate(self.header[1117]):
+                dirname = self.header[1118][self.header[1116][idx]]
+                self.filelist.append(RPMFile(
+                    name=dirname+name,
+                    size=self.header[1028][idx],
+                    mode=self.header[1030][idx],
+                    rdevice=self.header[1033][idx],
+                    time=self.header[1034][idx],
+                    digest=self.header[1035][idx],
+                    link_to=self.header[1036][idx],
+                    flags = self.header[1037][idx],
+                    username = self.header[1039][idx],
+                    group = self.header[1040][idx],
+                    verify_flags=self.header[1045][idx],
+                    device=self.header[1095][idx],
+                    inode=self.header[1096][idx],
+                    language=self.header[1097][idx],
+                    color=self.header[1140][idx],
+                    content_class=self.header[1142][self.header[1141][idx]],
+                    type='dir' if stat.S_ISDIR(self.header[1030][idx]) else ('ghost' if (self.header[1037][idx] & 64) else 'file'),
+                    primary=('bin/' in dirname or dirname.startswith('/etc/'))))
+        except:
+            pass
         
         # changelog
-        if self.header[1081]:
-            for name, time, text in zip(self.header[1081], self.header[1080], self.header[1082]):
-                self.changelog.append(RPMChangeLog(name=name, time=time, text=text))
+        try:
+            if self.header[1081]:
+                for name, time, text in zip(self.header[1081], self.header[1080], self.header[1082]):
+                    self.changelog.append(RPMChangeLog(name=name, time=time, text=text))
+        except:
+            pass
         
         # provides
-        if self.header[1047]:
-            for name, flags, version in zip(self.header[1047], self.header[1112], self.header[1113]):
-                self.provides.append(RPMprco(name=name, flags=flags, str_flags=self.RPM_PRCO_FLAGS_MAP[flags & 0xf], version=self._stringToVersion(version)))
+        try:
+            if self.header[1047]:
+                for name, flags, version in zip(self.header[1047], self.header[1112], self.header[1113]):
+                    self.provides.append(RPMprco(name=name, flags=flags, str_flags=self.RPM_PRCO_FLAGS_MAP[flags & 0xf], version=self._stringToVersion(version)))
+        except:
+            pass
         
         # requires
-        if self.header[1049]:
-            for name, flags, version in zip(self.header[1049], self.header[1048], self.header[1050]):
-                self.requires.append(RPMprco(name=name, flags=flags, str_flags=self.RPM_PRCO_FLAGS_MAP[flags & 0xf], version=self._stringToVersion(version)))
+        try:
+            if self.header[1049]:
+                for name, flags, version in zip(self.header[1049], self.header[1048], self.header[1050]):
+                    self.requires.append(RPMprco(name=name, flags=flags, str_flags=self.RPM_PRCO_FLAGS_MAP[flags & 0xf], version=self._stringToVersion(version)))
+        except:
+            pass
         
         # obsoletes
-        if self.header[1090]:
-            for name, flags, version in zip(self.header[1090], self.header[1114], self.header[1115]):
-                self.obsoletes.append(RPMprco(name=name, flags=flags, str_flags=self.RPM_PRCO_FLAGS_MAP[flags & 0xf], version=self._stringToVersion(version)))
+        try:
+            if self.header[1090]:
+                for name, flags, version in zip(self.header[1090], self.header[1114], self.header[1115]):
+                    self.obsoletes.append(RPMprco(name=name, flags=flags, str_flags=self.RPM_PRCO_FLAGS_MAP[flags & 0xf], version=self._stringToVersion(version)))
+        except:
+            pass
         
         # conflicts
-        if self.header[1054]:
-            for name, flags, version in zip(self.header[1054], self.header[1053], self.header[1055]):
-                self.conflicts.append(RPMprco(name=name, flags=flags, str_flags=self.RPM_PRCO_FLAGS_MAP[flags & 0xf], version=self._stringToVersion(version)))
+        try:
+            if self.header[1054]:
+                for name, flags, version in zip(self.header[1054], self.header[1053], self.header[1055]):
+                    self.conflicts.append(RPMprco(name=name, flags=flags, str_flags=self.RPM_PRCO_FLAGS_MAP[flags & 0xf], version=self._stringToVersion(version)))
+        except:
+            pass
     
     
     def _compute_checksum(self):
