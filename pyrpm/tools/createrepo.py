@@ -19,14 +19,12 @@ class YumRepository(object):
         self.primary_data = {}
         self.filelists_data = {}
         self.other_data = {}
-        
-        # read repo
-        if os.path.exists(os.path.join(self.repodir, 'repodata')):
-            self.read()
-
+    
+    
     def read(self):
         # open repomd to find xml files
-        repomd_tree = ElementTree.parse(os.path.join(self.repodir, 'repodata/repomd.xml'))
+        with self._retr_file('repodata/repomd.xml') as file:
+            repomd_tree = ElementTree.parse(file)
         
         # read XML files
         for type, dictionary, node_filter, id_func in [
@@ -44,10 +42,6 @@ class YumRepository(object):
 
     
     def save(self):
-        # check for folder
-        if not os.path.exists(os.path.join(self.repodir, 'repodata')):
-            os.mkdir(os.path.join(self.repodir, 'repodata'))
-        
         # create XML files
         primary_file, primary_file_gz       = self._create_meta(self.primary_data, '{http://linux.duke.edu/metadata/common}metadata', 'http://linux.duke.edu/metadata/common')
         filelists_file, filelists_file_gz   = self._create_meta(self.filelists_data, '{http://linux.duke.edu/metadata/filelists}filelists', 'http://linux.duke.edu/metadata/filelists')
@@ -89,7 +83,10 @@ class YumRepository(object):
         ElementTree.register_namespace('', 'http://linux.duke.edu/metadata/repo')
         
         # write everything out
-        tree.write(open(os.path.join(self.repodir, 'repodata/repomd.xml'), 'wt'), encoding='utf-8', xml_declaration=True, method='xml')
+        file = StringIO()
+        tree.write(file, encoding='utf-8', xml_declaration=True, method='xml')
+        self._store_file(file, 'repodata/repomd.xml')
+        file.close()
     
     
     def packages(self):
@@ -116,8 +113,9 @@ class YumRepository(object):
             return
         
         # parse primary XML
-        with gzip.GzipFile(os.path.join(self.repodir, location)) as file_gz:
-            tree = ElementTree.parse(file_gz)
+        with self._retr_file(location) as file:
+            with gzip.GzipFile(fileobj=file) as file_gz:
+                tree = ElementTree.parse(file_gz)
         
         # read package nodes
         for pkg_node in tree.findall(search_str):
@@ -144,7 +142,16 @@ class YumRepository(object):
         
         return output, output_gz
 
+    def _retr_file(self, filename):
+        return open(os.path.join(self.repodir, filename), 'rb')
+        
+
     def _store_file(self, file, filename):
+        # check for folder
+        if not os.path.exists(os.path.dirname(os.path.join(self.repodir, filename))):
+            os.mkdir(os.path.dirname(os.path.join(self.repodir, filename)))
+        
+        # store file
         file.seek(0)
         with open(os.path.join(self.repodir, filename), 'wb') as fs_file:
             data = file.read()
@@ -172,6 +179,9 @@ if __name__ == '__main__':
     from pyrpm.yum import YumPackage
     
     repo = YumRepository("D:\\Projekte\\pyrpm\\temprepo")
+    
+    # read existing repo
+    #repo.read()
     
     # add package
     repo.add_package(YumPackage(file(os.path.join(repo.repodir, 'tcl-devel-8.5.7-6.el6.x86_64.rpm'), 'rb')))
