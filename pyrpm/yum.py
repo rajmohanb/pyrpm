@@ -17,7 +17,7 @@ class YumPackage(RPM):
         element.append(Element('{http://linux.duke.edu/metadata/common}url', text=self.header.url))
         element.append(Element('{http://linux.duke.edu/metadata/common}time', {'file': '0', 'build': str(self.header.build_time)}))
         element.append(Element('{http://linux.duke.edu/metadata/common}size', {'package': str(self.header.size), 'installed': str(sum([file.size for file in self.filelist])), 'archive': str(self.header.archive_size)}))
-        element.append(Element('{http://linux.duke.edu/metadata/common}location', {'href':''}))
+        element.append(Element('{http://linux.duke.edu/metadata/common}location', {'href':self.canonical_filename}))
     
 
     def _xml_format_items(self, element):
