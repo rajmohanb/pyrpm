@@ -1,7 +1,14 @@
 import gzip
 import hashlib
 import os
+import os.path
 from xml.etree import ElementTree
+
+# try to import the best StringIO
+try:
+    from cStringIO import StringIO
+except:
+    from StringIO import StringIO
 
 from pyrpm.yum import YumPackage
 
@@ -14,16 +21,75 @@ class YumRepository(object):
         self.other_data = {}
         
         # read repo
-        self._read_repomd()
+        if os.path.exists(os.path.join(self.repodir, 'repodata')):
+            self.read()
+
+    def read(self):
+        # open repomd to find xml files
+        repomd_tree = ElementTree.parse(os.path.join(self.repodir, 'repodata/repomd.xml'))
+        
+        # read XML files
+        for type, dictionary, node_filter, id_func in [
+            ('primary', self.primary_data, "{http://linux.duke.edu/metadata/common}package", lambda x: x.find('{http://linux.duke.edu/metadata/common}checksum[@pkgid="YES"]').text),
+            ('filelists', self.filelists_data, "{http://linux.duke.edu/metadata/filelists}package", lambda x: x.attrib['pkgid']),
+            ('other', self.other_data,"{http://linux.duke.edu/metadata/other}package", lambda x: x.attrib['pkgid'])]:
+            
+            # find location
+            node = repomd_tree.find("{http://linux.duke.edu/metadata/repo}data[@type='" + type + "']")
+            if node is None:
+                continue
+            
+            # parse file
+            self._read_meta(node.find('{http://linux.duke.edu/metadata/repo}location').get('href', None), dictionary, node_filter, id_func)
+
     
     def save(self):
-        # write XML files
-        self._write_primary()
-        self._write_filelists()
-        self._write_other()
-
-        # write repomd to find xml files
-        self._write_repomd()
+        # check for folder
+        if not os.path.exists(os.path.join(self.repodir, 'repodata')):
+            os.mkdir(os.path.join(self.repodir, 'repodata'))
+        
+        # create XML files
+        primary_file, primary_file_gz       = self._create_meta(self.primary_data, '{http://linux.duke.edu/metadata/common}metadata', 'http://linux.duke.edu/metadata/common')
+        filelists_file, filelists_file_gz   = self._create_meta(self.filelists_data, '{http://linux.duke.edu/metadata/filelists}filelists', 'http://linux.duke.edu/metadata/filelists')
+        other_file, other_file_gz           = self._create_meta(self.other_data, '{http://linux.duke.edu/metadata/other}otherdata', 'http://linux.duke.edu/metadata/other')
+        
+        # create repomd
+        tree = ElementTree.ElementTree(ElementTree.Element("{http://linux.duke.edu/metadata/repo}repomd"))
+        
+        # compute file-stuff
+        for type, file, file_gz, filename in [
+            ('primary', primary_file, primary_file_gz, 'repodata/primary.xml.gz'),
+            ('filelists', filelists_file, filelists_file_gz, 'repodata/filelists.xml.gz'),
+            ('other', other_file, other_file_gz, 'repodata/other.xml.gz')]:
+            
+            # compute file numbers (size, checksum)
+            open_size = file.tell()
+            open_checksum = self._hash(file)
+            normal_size = file_gz.tell()
+            normal_checksum = self._hash(file_gz)
+            
+            # create XML
+            e = ElementTree.Element("{http://linux.duke.edu/metadata/repo}data", {'type': type})
+            self._add_node(e, "{http://linux.duke.edu/metadata/repo}checksum", {'type': 'sha256'}, text=normal_checksum)
+            self._add_node(e, "{http://linux.duke.edu/metadata/repo}size", text=str(normal_size))
+            self._add_node(e, "{http://linux.duke.edu/metadata/repo}open-checksum", {'type': 'sha256'}, text=open_checksum)
+            self._add_node(e, "{http://linux.duke.edu/metadata/repo}open-size", text=str(open_size))
+            self._add_node(e, "{http://linux.duke.edu/metadata/repo}location", {'href': filename})
+            tree.getroot().append(e)
+            
+            # write files
+            self._store_file(file_gz, filename)
+            
+            # close files
+            file.close()
+            file_gz.close()
+        
+        # map namespaces
+        ElementTree.register_namespace('rpm', 'http://linux.duke.edu/metadata/rpm')
+        ElementTree.register_namespace('', 'http://linux.duke.edu/metadata/repo')
+        
+        # write everything out
+        tree.write(open(os.path.join(self.repodir, 'repodata/repomd.xml'), 'wt'), encoding='utf-8', xml_declaration=True, method='xml')
     
     
     def packages(self):
@@ -44,151 +110,57 @@ class YumRepository(object):
             if pkgid in part:
                 del part[pkgid]
     
-    
-    def _read_repomd(self):
-        # open repomd to find xml files
-        repomd_tree = ElementTree.parse(os.path.join(self.repodir, 'repodata/repomd.xml'))
-        
-        # read XML files
-        for type, func in [('primary', self._read_primary), ('filelists', self._read_filelists), ('other', self._read_other)]:
-            node = repomd_tree.find("{http://linux.duke.edu/metadata/repo}data[@type='" + type + "']")
-            if node is not None:
-                func(node.find('{http://linux.duke.edu/metadata/repo}location').get('href', None))
-    
-    
-    def _read_primary(self, location):
+
+    def _read_meta(self, location, dictionary, search_str, id_func):
         if not location:
             return
         
         # parse primary XML
-        with gzip.GzipFile(os.path.join(self.repodir, location)) as primary_file:
-            primary_tree = ElementTree.parse(primary_file)
+        with gzip.GzipFile(os.path.join(self.repodir, location)) as file_gz:
+            tree = ElementTree.parse(file_gz)
         
         # read package nodes
-        for pkg_node in primary_tree.findall("{http://linux.duke.edu/metadata/common}package"):
-            # extract pkgid
-            pkgid = pkg_node.find('{http://linux.duke.edu/metadata/common}checksum[@pkgid="YES"]').text
-            self.primary_data[pkgid] = pkg_node
-    
-    
-    def _read_filelists(self, location):
-        if not location:
-            return
-        
-        # parse primary XML
-        with gzip.GzipFile(os.path.join(self.repodir, location)) as filelists_file:
-            filelists_tree = ElementTree.parse(filelists_file)
-        
-        # read package nodes
-        for pkg_node in filelists_tree.findall("{http://linux.duke.edu/metadata/filelists}package"):
-            self.filelists_data[pkg_node.attrib['pkgid']] = pkg_node
-    
-    
-    def _read_other(self, location):
-        if not location:
-            return
-        
-        # parse primary XML
-        with gzip.GzipFile(os.path.join(self.repodir, location)) as other_file:
-            other_tree = ElementTree.parse(other_file)
-        
-        # read package nodes
-        for pkg_node in other_tree.findall("{http://linux.duke.edu/metadata/other}package"):
-            self.other_data[pkg_node.attrib['pkgid']] = pkg_node
-    
+        for pkg_node in tree.findall(search_str):
+            dictionary[id_func(pkg_node)] = pkg_node
 
-    def _write_primary(self):
+
+    def _create_meta(self, list, root_tag, local_namespace):
         # create complete document
-        tree = ElementTree.ElementTree(ElementTree.Element('{http://linux.duke.edu/metadata/common}metadata'))
-        tree.getroot().set('packages', str(len(self.primary_data)))
-        for pkg_node in self.primary_data.items():
+        tree = ElementTree.ElementTree(ElementTree.Element(root_tag))
+        tree.getroot().set('packages', str(len(list)))
+        for pkg_node in list.items():
             tree.getroot().append(pkg_node[1])
         
         # map namespaces
         ElementTree.register_namespace('rpm', 'http://linux.duke.edu/metadata/rpm')
-        ElementTree.register_namespace('', 'http://linux.duke.edu/metadata/common')
+        ElementTree.register_namespace('', 'local_namespace')
         
         # write it out
-        with gzip.GzipFile(os.path.join(self.repodir, 'repodata/primary.xml.gz'), 'w') as primary_file:
+        output = StringIO()
+        output_gz = StringIO()
+        with gzip.GzipFile(fileobj=output_gz, mode='w') as primary_file:
+            tree.write(output, 'utf-8', True)
             tree.write(primary_file, 'utf-8', True)
-    
-    
-    def _write_filelists(self):
-        # create complete document
-        tree = ElementTree.ElementTree(ElementTree.Element('{http://linux.duke.edu/metadata/filelists}filelists'))
-        tree.getroot().set('packages', str(len(self.filelists_data)))
-        for pkg_node in self.filelists_data.items():
-            tree.getroot().append(pkg_node[1])
         
-        # map namespaces
-        ElementTree.register_namespace('rpm', 'http://linux.duke.edu/metadata/rpm')
-        ElementTree.register_namespace('', 'http://linux.duke.edu/metadata/filelists')
-        
-        # write it out
-        with gzip.GzipFile(os.path.join(self.repodir, 'repodata/filelists.xml.gz'), 'w') as primary_file:
-            tree.write(primary_file, 'utf-8', True)
-    
-    
-    def _write_other(self):
-        # create complete document
-        tree = ElementTree.ElementTree(ElementTree.Element('{http://linux.duke.edu/metadata/other}otherdata'))
-        tree.getroot().set('packages', str(len(self.other_data)))
-        for pkg_node in self.other_data.items():
-            tree.getroot().append(pkg_node[1])
-        
-        # map namespaces
-        ElementTree.register_namespace('rpm', 'http://linux.duke.edu/metadata/rpm')
-        ElementTree.register_namespace('', 'http://linux.duke.edu/metadata/other')
-        
-        # write it out
-        with gzip.GzipFile(os.path.join(self.repodir, 'repodata/other.xml.gz'), 'w') as primary_file:
-            tree.write(primary_file, 'utf-8', True)
+        return output, output_gz
 
+    def _store_file(self, file, filename):
+        file.seek(0)
+        with open(os.path.join(self.repodir, filename), 'wb') as fs_file:
+            data = file.read()
+            while data:
+                fs_file.write(data)
+                data = file.read()
 
-    def _write_repomd(self):
-        tree = ElementTree.ElementTree(ElementTree.Element("{http://linux.duke.edu/metadata/repo}repomd"))
-        
-        # compute file-stuff
-        for type, filename in [('primary', 'repodata/primary.xml.gz'), ('filelists', 'repodata/filelists.xml.gz'), ('other', 'repodata/other.xml.gz')]:
-            # compute open numbers (size, checksum)
-            with gzip.GzipFile(os.path.join(self.repodir, filename)) as open_file:
-                m = hashlib.sha256()
-                open_size = 0
-                data = open_file.read()
-                while data:
-                    open_size += len(data)
-                    m.update(data)
-                    data = open_file.read()
-                open_checksum = m.hexdigest()
-            
-            # compute normal numbers
-            with open(os.path.join(self.repodir, filename), 'rb') as normal_file:
-                m = hashlib.sha256()
-                normal_size = 0
-                
-                data = normal_file.read()
-                while data:
-                    normal_size += len(data)
-                    m.update(data)
-                    data = normal_file.read()
-                normal_checksum = m.hexdigest()
-            
-            e = ElementTree.Element("{http://linux.duke.edu/metadata/repo}data", {'type': type})
-            self._add_node(e, "{http://linux.duke.edu/metadata/repo}checksum", {'type': 'sha256'}, text=normal_checksum)
-            self._add_node(e, "{http://linux.duke.edu/metadata/repo}size", text=str(normal_size))
-            self._add_node(e, "{http://linux.duke.edu/metadata/repo}open-checksum", {'type': 'sha256'}, text=open_checksum)
-            self._add_node(e, "{http://linux.duke.edu/metadata/repo}open-size", text=str(open_size))
-            self._add_node(e, "{http://linux.duke.edu/metadata/repo}location", {'href': filename})
-            tree.getroot().append(e)
-        
-        # map namespaces
-        ElementTree.register_namespace('rpm', 'http://linux.duke.edu/metadata/rpm')
-        ElementTree.register_namespace('', 'http://linux.duke.edu/metadata/repo')
-        
-        # write it out
-        tree.write(open(os.path.join(self.repodir, 'repodata/repomd.xml'), 'wt'), encoding='utf-8', xml_declaration=True, method='xml')
-    
-    
+    def _hash(self, file):
+        file.seek(0)
+        m = hashlib.sha256()
+        data = file.read()
+        while data:
+            m.update(data)
+            data = file.read()
+        return m.hexdigest()
+
     def _add_node(self, parent, tag, attrib={}, text=None):
             a = ElementTree.Element(tag, attrib)
             if text is not None:
