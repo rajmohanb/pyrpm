@@ -5,10 +5,7 @@ import os.path
 from xml.etree import ElementTree
 
 # try to import the best StringIO
-try:
-    from cStringIO import StringIO
-except:
-    from StringIO import StringIO
+from StringIO import StringIO
 
 from pyrpm.yum import YumPackage
 
