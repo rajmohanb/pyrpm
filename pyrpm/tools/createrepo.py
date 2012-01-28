@@ -128,7 +128,7 @@ class YumRepository(object):
         
         # map namespaces
         ElementTree.register_namespace('rpm', 'http://linux.duke.edu/metadata/rpm')
-        ElementTree.register_namespace('', 'local_namespace')
+        ElementTree.register_namespace('', local_namespace)
         
         # write it out
         output = StringIO()
