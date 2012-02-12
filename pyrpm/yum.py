@@ -23,7 +23,7 @@ class YumPackage(RPM):
         ele.append(element('{http://linux.duke.edu/metadata/common}packager', text=self.header.packager))
         ele.append(element('{http://linux.duke.edu/metadata/common}url', text=self.header.url))
         ele.append(element('{http://linux.duke.edu/metadata/common}time', {'file': str(self.header.build_time), 'build': str(self.header.build_time)}))
-        ele.append(element('{http://linux.duke.edu/metadata/common}size', {'package': str(self.header.size), 'installed': str(sum([file.size for file in self.filelist])), 'archive': str(self.header.archive_size)}))
+        ele.append(element('{http://linux.duke.edu/metadata/common}size', {'package': str(self.filesize), 'installed': str(sum([file.size for file in self.filelist])), 'archive': str(self.header.archive_size)}))
         ele.append(element('{http://linux.duke.edu/metadata/common}location', {'href':self.canonical_filename}))
     
 

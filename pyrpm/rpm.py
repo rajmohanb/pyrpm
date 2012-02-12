@@ -421,10 +421,13 @@ class RPM(object):
     def _compute_checksum(self):
         self.rpmfile.seek(0)
         m = hashlib.sha256()
+        size = 0
         data = self.rpmfile.read()
         while data:
+            size += len(data)
             m.update(data)
             data = self.rpmfile.read()
+        self.filesize = size
         self.checksum = m.hexdigest()
     
     
