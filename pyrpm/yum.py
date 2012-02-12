@@ -111,7 +111,7 @@ class YumPackage(RPM):
                 if r:
                     entry.set('rel', r)
             if prco.flags & 1600:
-                prcostring += ''' pre="1"'''
+                entry.set('pre', '1')
             
             ef.append(entry)
             used += 1
