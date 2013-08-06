@@ -336,9 +336,7 @@ class RPM(object):
         # files
         try:
             for idx, name in enumerate(self.header[1117]):
-                print idx, name
                 dirname = self.header[1118][self.header[1116][idx]]
-                print dirname
                 self.filelist.append(RPMFile(
                     name=dirname + name,
                     size=self.header[1028][idx],
