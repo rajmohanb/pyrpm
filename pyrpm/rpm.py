@@ -19,10 +19,11 @@ import struct
 import re
 import hashlib
 
+
 class Entry(object):
+
     ''' RPM Header Entry '''
-    
-    
+
     def __init__(self, entry=None, store=None, tag=None, type=None, value=None):
         DECODING_MAP = {
             0: self._read_null,
@@ -36,12 +37,12 @@ class Entry(object):
             8: self._read_string_array,
             9: self._read_string,
         }
-        
+
         # read from file if possible
         if entry is not None and store is not None:
             # seek to position in store
             store.seek(entry[2])
-            
+
             # decode information
             self.entry = entry
             self.tag = entry[0]
@@ -52,14 +53,11 @@ class Entry(object):
             self.type = type
             self.value = value
 
-
     def __str__(self):
         return "(%s, %s)" % (self.tag, self.value, )
 
-
     def __repr__(self):
         return "(%s, %s)" % (self.tag, self.value, )
-
 
     def _read_format(self, fmt, store):
         size = struct.calcsize(fmt)
@@ -67,10 +65,8 @@ class Entry(object):
         unpacked_data = struct.unpack(fmt, data)
         return unpacked_data[0] if len(unpacked_data) == 1 else unpacked_data
 
-    
     def _read_null(self, store, data_count):
         return None
-
 
     def _read_char(self, store, data_count):
         ''' store is a pointer to the store offset
@@ -78,30 +74,25 @@ class Entry(object):
         '''
         return self._read_format('!{0:d}c'.format(data_count), store)
 
-
     def _read_int8(self, store, data_count):
         ''' int8 = 1byte
         '''
         return int(self._read_char(store, data_count))
-
 
     def _read_int16(self, store, data_count):
         ''' int16 = 2bytes
         '''
         return self._read_format('!{0:d}h'.format(data_count), store)
 
-
     def _read_int32(self, store, data_count):
         ''' int32 = 4bytes
         '''
         return self._read_format('!{0:d}i'.format(data_count), store)
 
-
     def _read_int64(self, store, data_count):
         ''' int64 = 8bytes
         '''
         return self._read_format('!{0:d}q'.format(data_count), store)
-
 
     def _read_string(self, store, data_count):
         ''' read a string entry
@@ -109,17 +100,15 @@ class Entry(object):
         string = ''
         while True:
             char = self._read_char(store, 1)
-            if char[0] == '\x00': # read until '\0'
+            if char[0] == '\x00':  # read until '\0'
                 break
             string += char[0]
         return string.decode('utf-8')
 
-    
     def _read_string_array(self, store, data_count):
         ''' read a array of string entries
         '''
         return [self._read_string(store, 1) for i in range(data_count)]
-
 
     def _read_binary(self, store, data_count):
         ''' read a binary entry
@@ -128,44 +117,44 @@ class Entry(object):
 
 
 class HeaderBase(object):
+
     ''' RPM Header Structure '''
     MAGIC_NUMBER = '\x8e\xad\xe8'
     MAGIC_NUMBER_MATCHER = re.compile('(\x8e\xad\xe8)')
-    
+
     TAGS = {}
-    
+
     def __init__(self, file):
         ''' read a RPM header structure with all its entries
-        
+
             Header format:
             [3bytes][1byte][4bytes][4bytes][4bytes]
               MN      VER   UNUSED  IDXNUM  STSIZE
-          
+
             Entry format:
             [4bytes][4bytes][4bytes][4bytes]
                TAG    TYPE   OFFSET  COUNT
         '''
         self.entries = []
-        
+
         # read from file if possible
         if file:
             # read and check header
             header = struct.unpack('!3sc4sll', file.read(16))
             if header[0] != self.MAGIC_NUMBER:
                 raise RPMError('invalid RPM header')
-    
+
             # read entries and store
             entries = [file.read(16) for i in range(header[3])]
             store = StringIO(file.read(header[4]))
-            
+
             # parse entries
             for entry in entries:
                 parsed_entry = struct.unpack("!4l", entry)
                 object_entry = Entry(parsed_entry, store)
-                
+
                 if object_entry:
                     self.entries.append(object_entry)
-
 
     def __getattr__(self, name):
         if name in self.TAGS:
@@ -174,15 +163,13 @@ class HeaderBase(object):
                 return self[id]
             except:
                 return default
-        
+
         raise AttributeError(name)
 
-    
     def __iter__(self):
         for entry in self.entries:
             yield entry
 
-    
     def __getitem__(self, item):
         for entry in self:
             if entry.tag == item:
@@ -190,7 +177,7 @@ class HeaderBase(object):
         raise KeyError()
 
 
-# singature header section
+# signature header section
 class Signature(HeaderBase):
     TAGS = {
         'size': (1000, -1),
@@ -233,42 +220,41 @@ class RPMError(BaseException):
     pass
 
 
-RPMFile = namedtuple("RPMFile", ['name', 'size', 'mode', 'rdevice', 'device', 'time', 'digest', 'link_to', 'flags', 'username', 'group', 'verify_flags', 'language', 'inode', 'color', 'content_class', 'type', 'primary'])
+RPMFile = namedtuple("RPMFile", ['name', 'size', 'mode', 'rdevice', 'device', 'time', 'digest', 'link_to',
+                     'flags', 'username', 'group', 'verify_flags', 'language', 'inode', 'color', 'content_class', 'type', 'primary'])
 RPMChangeLog = namedtuple("RPMChangeLog", ['name', 'text', 'time'])
 RPMprco = namedtuple("RPMprco", ['name', 'version', 'flags', 'str_flags'])
 
 
 class RPM(object):
     RPM_LEAD_MAGIC_NUMBER = '\xed\xab\xee\xdb'
-    RPM_PRCO_FLAGS_MAP = { 0: None, 2: 'LT', 4: 'GT', 8: 'EQ', 10: 'LE', 12: 'GE' }
-    
+    RPM_PRCO_FLAGS_MAP = {0: None, 2: 'LT', 4: 'GT', 8: 'EQ', 10: 'LE', 12: 'GE'}
 
     def __init__(self, rpm):
         ''' rpm - StringIO.StringIO | file
         '''
-        if hasattr(rpm, 'read'): # if it walk like a duck..
+        if hasattr(rpm, 'read'):  # if it walk like a duck..
             self.rpmfile = rpm
         else:
             raise ValueError('invalid initialization: StringIO or file expected received %s' % (type(rpm), ))
-        
+
         self.binary = None
         self.source = None
         self.header = None
         self.signature = None
         self.filelist = []
         self.changelog = []
-        
+
         self.provides = []
         self.requires = []
         self.obsoletes = []
         self.conflicts = []
-        
+
         self._read_lead()
         self._read_signature()
         self._read_header()
         self._match_composite()
         self._compute_checksum()
-
 
     @property
     def canonical_filename(self):
@@ -310,28 +296,25 @@ class RPM(object):
         else:
             raise RPMError('wrong package type this is not a RPM file')
 
-
     def _read_signature(self):
         ''' read signature header '''
-        
+
         # find the start of the header
         if not self._find_magic_number():
             raise RPMError('invalid RPM file, signature area not found')
-        
+
         # consume signature area
         self.signature = Signature(self.rpmfile)
 
-
     def _read_header(self):
         ''' read information header '''
-        
+
         # find the start of the header
         if not self._find_magic_number():
             raise RPMError('invalid RPM file, header not found')
-        
+
         # consume header area
         self.header = Header(self.rpmfile)
-
 
     def _find_magic_number(self):
         ''' find a magic number in a buffer
@@ -349,75 +332,79 @@ class RPM(object):
                 string += byte
         return False
 
-
     def _match_composite(self):
         # files
         try:
             for idx, name in enumerate(self.header[1117]):
+                print idx, name
                 dirname = self.header[1118][self.header[1116][idx]]
+                print dirname
                 self.filelist.append(RPMFile(
-                    name=dirname+name,
+                    name=dirname + name,
                     size=self.header[1028][idx],
                     mode=self.header[1030][idx],
                     rdevice=self.header[1033][idx],
                     time=self.header[1034][idx],
                     digest=self.header[1035][idx],
                     link_to=self.header[1036][idx],
-                    flags = self.header[1037][idx],
-                    username = self.header[1039][idx],
-                    group = self.header[1040][idx],
+                    flags=self.header[1037][idx],
+                    username=self.header[1039][idx],
+                    group=self.header[1040][idx],
                     verify_flags=self.header[1045][idx],
                     device=self.header[1095][idx],
                     inode=self.header[1096][idx],
                     language=self.header[1097][idx],
-                    color=self.header[1140][idx],
-                    content_class=self.header[1142][self.header[1141][idx]],
+                    color=self.header[1140][idx] if 1140 in self.header else None,
+                    content_class=self.header[1142][self.header[1141][idx]] if 1142 in self.header and 1141 in self.header else None,
                     type='dir' if stat.S_ISDIR(self.header[1030][idx]) else ('ghost' if (self.header[1037][idx] & 64) else 'file'),
                     primary=('bin/' in dirname or dirname.startswith('/etc/'))))
         except:
             pass
-        
-        # changelog
+
+        # change log
         try:
             if self.header[1081]:
                 for name, time, text in zip(self.header[1081], self.header[1080], self.header[1082]):
                     self.changelog.append(RPMChangeLog(name=name, time=time, text=text))
         except:
             pass
-        
+
         # provides
         try:
             if self.header[1047]:
                 for name, flags, version in zip(self.header[1047], self.header[1112], self.header[1113]):
-                    self.provides.append(RPMprco(name=name, flags=flags, str_flags=self.RPM_PRCO_FLAGS_MAP[flags & 0xf], version=self._stringToVersion(version)))
+                    self.provides.append(
+                        RPMprco(name=name, flags=flags, str_flags=self.RPM_PRCO_FLAGS_MAP[flags & 0xf], version=self._stringToVersion(version)))
         except:
             pass
-        
+
         # requires
         try:
             if self.header[1049]:
                 for name, flags, version in zip(self.header[1049], self.header[1048], self.header[1050]):
-                    self.requires.append(RPMprco(name=name, flags=flags, str_flags=self.RPM_PRCO_FLAGS_MAP[flags & 0xf], version=self._stringToVersion(version)))
+                    self.requires.append(
+                        RPMprco(name=name, flags=flags, str_flags=self.RPM_PRCO_FLAGS_MAP[flags & 0xf], version=self._stringToVersion(version)))
         except:
             pass
-        
+
         # obsoletes
         try:
             if self.header[1090]:
                 for name, flags, version in zip(self.header[1090], self.header[1114], self.header[1115]):
-                    self.obsoletes.append(RPMprco(name=name, flags=flags, str_flags=self.RPM_PRCO_FLAGS_MAP[flags & 0xf], version=self._stringToVersion(version)))
+                    self.obsoletes.append(
+                        RPMprco(name=name, flags=flags, str_flags=self.RPM_PRCO_FLAGS_MAP[flags & 0xf], version=self._stringToVersion(version)))
         except:
             pass
-        
+
         # conflicts
         try:
             if self.header[1054]:
                 for name, flags, version in zip(self.header[1054], self.header[1053], self.header[1055]):
-                    self.conflicts.append(RPMprco(name=name, flags=flags, str_flags=self.RPM_PRCO_FLAGS_MAP[flags & 0xf], version=self._stringToVersion(version)))
+                    self.conflicts.append(
+                        RPMprco(name=name, flags=flags, str_flags=self.RPM_PRCO_FLAGS_MAP[flags & 0xf], version=self._stringToVersion(version)))
         except:
             pass
-    
-    
+
     def _compute_checksum(self):
         self.rpmfile.seek(0)
         m = hashlib.sha256()
@@ -429,8 +416,7 @@ class RPM(object):
             data = self.rpmfile.read()
         self.filesize = size
         self.checksum = m.hexdigest()
-    
-    
+
     def _stringToVersion(self, verstring):
         if verstring in [None, '']:
             return (None, None, None)
@@ -440,7 +426,7 @@ class RPM(object):
                 epoch = str(long(verstring[:i]))
             except ValueError:
                 # look, garbage in the epoch field, how fun, kill it
-                epoch = '0' # this is our fallback, deal
+                epoch = '0'  # this is our fallback, deal
         else:
             epoch = '0'
         j = verstring.find('-')
@@ -457,4 +443,3 @@ class RPM(object):
                 version = verstring[i + 1:]
             release = None
         return (epoch, version, release)
-

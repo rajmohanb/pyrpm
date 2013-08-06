@@ -12,7 +12,7 @@ def element(tag, attrib={}, text=None):
 ##################
 # Real classes
 #################
-class YumPackage(RPM):  
+class YumPackage(RPM):
     def _xml_base_items(self, ele):
         ele.append(element('{http://linux.duke.edu/metadata/common}name', text=self.header.name))
         ele.append(element('{http://linux.duke.edu/metadata/common}arch', text=self.header.architecture))
@@ -25,7 +25,6 @@ class YumPackage(RPM):
         ele.append(element('{http://linux.duke.edu/metadata/common}time', {'file': str(self.header.build_time), 'build': str(self.header.build_time)}))
         ele.append(element('{http://linux.duke.edu/metadata/common}size', {'package': str(self.filesize), 'installed': str(sum([file.size for file in self.filelist])), 'archive': str(self.header.archive_size)}))
         ele.append(element('{http://linux.duke.edu/metadata/common}location', {'href':self.canonical_filename}))
-    
 
     def _xml_format_items(self, ele):
         ef = element('{http://linux.duke.edu/metadata/common}format')
@@ -34,13 +33,13 @@ class YumPackage(RPM):
         ef.append(element('{http://linux.duke.edu/metadata/rpm}group', text=self.header.group))
         ef.append(element('{http://linux.duke.edu/metadata/rpm}buildhost', text=self.header.build_host))
         ef.append(element('{http://linux.duke.edu/metadata/rpm}sourcerpm', text=self.header.source_rpm))
-        
+
         self._xml_pco(ef, 'provides')
         self._xml_requires(ef)
-        self._xml_pco(ef, 'conflicts')         
-        self._xml_pco(ef, 'obsoletes')         
+        self._xml_pco(ef, 'conflicts')
+        self._xml_pco(ef, 'obsoletes')
         self._xml_files(ef, True)
-        
+
         ele.append(ef)
 
 
@@ -49,7 +48,7 @@ class YumPackage(RPM):
         mylist = getattr(self, pcotype)
         if not mylist:
             return
-        
+
         ef = element('{http://linux.duke.edu/metadata/rpm}' + pcotype)
         for prco in sorted(mylist):
             entry = element('{http://linux.duke.edu/metadata/rpm}entry', {'name': prco.name})
@@ -64,8 +63,7 @@ class YumPackage(RPM):
                     entry.set('rel', r)
             ef.append(entry)
         ele.append(ef)
-    
-    
+
     def _xml_files(self, ele, primary=False):
         # sort files
         files = {'file': [], 'dir': [], 'ghost': []}
@@ -73,25 +71,24 @@ class YumPackage(RPM):
             if primary and not file.primary:
                 continue
             files[file.type].append(file)
-        
+
         # create output
         for file in sorted(files['file']):
             ele.append(element("{http://linux.duke.edu/metadata/filelists}file", text=file.name))
-        
+
         for type in ['dir', 'ghost']:
             for file in sorted(files[type]):
                 ele.append(element("{http://linux.duke.edu/metadata/filelists}file", {'type': type}, text=file.name))
-    
 
     def _xml_requires(self, ele):
         """returns deps in XML format"""
         ef = element('{http://linux.duke.edu/metadata/rpm}requires')
         used = 0
-        
+
         for prco in sorted(self.requires):
             if prco.name.startswith('rpmlib('):
                 continue
-            
+
             # this drops out requires that the pkg provides for itself.
             if prco.name in [p.name for p in self.provides] or (prco.name.startswith('/') and (prco.name in [file.name for file in self.filelist])):
                 if not prco.flags:
@@ -99,7 +96,7 @@ class YumPackage(RPM):
                 else:
                     if prco in self.provides:
                         continue
-            
+
             entry = element('{http://linux.duke.edu/metadata/rpm}entry', {'name': prco.name})
             if prco.str_flags:
                 entry.set('flags', prco.str_flags)
@@ -112,10 +109,10 @@ class YumPackage(RPM):
                     entry.set('rel', r)
             if prco.flags & 1600:
                 entry.set('pre', '1')
-            
+
             ef.append(entry)
             used += 1
-            
+
         if used != 0:
             ele.append(ef)
 
@@ -123,7 +120,7 @@ class YumPackage(RPM):
     def _xml_changelog(self, ele, clog_limit=0):
         if not self.changelog:
             return ""
-        
+
         # We need to output them "backwards", so the oldest is first
         clogs = self.changelog[:clog_limit] if clog_limit else self.changelog
         for changelog in clogs:
@@ -135,15 +132,13 @@ class YumPackage(RPM):
         self._xml_base_items(ele)
         self._xml_format_items(ele)
         return ele
-    
-    
+
     def xml_filelists_metadata(self):
         ele = element("{http://linux.duke.edu/metadata/filelists}package", {'pkgid': self.checksum, 'name': self.header.name, 'arch': self.header.architecture})
         ele.append(element("{http://linux.duke.edu/metadata/filelists}version", {'epoch': str(self.header.epoch), 'ver': self.header.version, 'rel': self.header.release}))
         self._xml_files(ele)
         return ele
-    
-    
+
     def xml_other_metadata(self, clog_limit=0):
         ele = element("{http://linux.duke.edu/metadata/other}package", {'pkgid': self.checksum, 'name': self.header.name, 'arch': self.header.architecture})
         ele.append(element("{http://linux.duke.edu/metadata/other}version", {'epoch': str(self.header.epoch), 'ver': self.header.version, 'rel': self.header.release}))
