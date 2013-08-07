@@ -9,6 +9,48 @@ from StringIO import StringIO
 
 from pyrpm.yum import YumPackage
 
+# monkey-patch ElementTree 1.2.6 and below to make register_namespace work
+if ElementTree.VERSION[0:3] == '1.2':
+    #in etree < 1.3, this is a workaround for suppressing prefixes
+
+    def fixtag(tag, namespaces):
+        import string
+        # given a decorated tag (of the form {uri}tag), return prefixed
+        # tag and namespace declaration, if any
+        if isinstance(tag, ElementTree.QName):
+            tag = tag.text
+        namespace_uri, tag = string.split(tag[1:], "}", 1)
+        prefix = namespaces.get(namespace_uri)
+        if namespace_uri not in namespaces:
+            prefix = ElementTree._namespace_map.get(namespace_uri)
+            if namespace_uri not in ElementTree._namespace_map:
+                prefix = "ns%d" % len(namespaces)
+            namespaces[namespace_uri] = prefix
+            if prefix == "xml":
+                xmlns = None
+            else:
+                if prefix is not None:
+                    nsprefix = ':' + prefix
+                else:
+                    nsprefix = ''
+                xmlns = ("xmlns%s" % nsprefix, namespace_uri)
+        else:
+            xmlns = None
+        if prefix is not None:
+            prefix += ":"
+        else:
+            prefix = ''
+
+        return "%s%s" % (prefix, tag), xmlns
+    ElementTree.fixtag = fixtag
+
+def register_namespace(name, ns):
+    if ElementTree.VERSION[0:3] == '1.2':
+        ElementTree._namespace_map[ns] = name if name else None
+    else:
+        #For etree > 1.3, use register_namespace function
+        ElementTree.register_namespace(name, ns)
+
 class YumRepository(object):
 
     def __init__(self, repodir):
@@ -74,12 +116,13 @@ class YumRepository(object):
             file_gz.close()
 
         # map namespaces
-        ElementTree.register_namespace('rpm', 'http://linux.duke.edu/metadata/rpm')
-        ElementTree.register_namespace('', 'http://linux.duke.edu/metadata/repo')
+        register_namespace('rpm', 'http://linux.duke.edu/metadata/rpm')
+        register_namespace('', 'http://linux.duke.edu/metadata/repo')
 
         # write everything out
         file = StringIO()
-        tree.write(file, encoding='utf-8', xml_declaration=True, method='xml')
+        file.write("<?xml version='1.0' encoding='utf-8'?>\n")
+        tree.write(file, encoding='utf-8')
         self._store_file(file, 'repodata/repomd.xml')
         file.close()
 
@@ -105,8 +148,9 @@ class YumRepository(object):
 
         # parse primary XML
         with self._retr_file(location) as file:
-            with gzip.GzipFile(fileobj=file) as file_gz:
-                tree = ElementTree.parse(file_gz)
+            file_gz = gzip.GzipFile(fileobj=file)
+            tree = ElementTree.parse(file_gz)
+            file_gz.close()
 
         # read package nodes
         for pkg_node in tree.findall(search_str):
@@ -121,15 +165,16 @@ class YumRepository(object):
             tree.getroot().append(pkg_node[1])
 
         # map namespaces
-        ElementTree.register_namespace('rpm', 'http://linux.duke.edu/metadata/rpm')
-        ElementTree.register_namespace('', local_namespace)
+        register_namespace('rpm', 'http://linux.duke.edu/metadata/rpm')
+        register_namespace('', local_namespace)
 
         # write it out
         output = StringIO()
         output_gz = StringIO()
-        with gzip.GzipFile(fileobj=output_gz, mode='w') as primary_file:
-            tree.write(output, 'utf-8', True)
-            tree.write(primary_file, 'utf-8', True)
+        primary_file = gzip.GzipFile(fileobj=output_gz, mode='w')
+        for file_obj in (output, primary_file):
+            file_obj.write("<?xml version='1.0' encoding='utf-8'?>\n")
+            tree.write(file_obj, 'utf-8')
 
         return output, output_gz
 
