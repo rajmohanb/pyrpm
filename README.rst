@@ -1,6 +1,8 @@
 =====
-PyRPM .. image:: https://travis-ci.org/02strich/pyrpm.png   :target: https://travis-ci.org/02strich/pyrpm
+PyRPM
 =====
+
+.. image:: https://travis-ci.org/02strich/pyrpm.png
 
 :authors: Stefan Richter, Mário Morgado
 :license: BSD
