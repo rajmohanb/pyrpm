@@ -1,5 +1,10 @@
 import unittest
-from cStringIO import StringIO
+import sys
+
+if sys.version < '3':
+    from cStringIO import StringIO as BytesIO
+else:
+    from io import BytesIO
 
 from pyrpm.rpm import RPM
 
@@ -8,7 +13,7 @@ class RPMTest(unittest.TestCase):
 
     def setUp(self):
 
-        self.rpm = RPM(file('tests/Eterm-0.9.3-5mdv2007.0.src.rpm'))
+        self.rpm = RPM(open('tests/Eterm-0.9.3-5mdv2007.0.src.rpm', 'rb'))
 
     def test_entries(self):
 
@@ -33,4 +38,4 @@ class RPMStringIOTest(RPMTest):
 
     def setUp(self):
 
-        self.rpm = RPM(StringIO(file('tests/Eterm-0.9.3-5mdv2007.0.src.rpm').read()))
+        self.rpm = RPM(BytesIO(open('tests/Eterm-0.9.3-5mdv2007.0.src.rpm', 'rb').read()))

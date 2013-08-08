@@ -5,16 +5,20 @@ PyRPM
 PyRPM is a pure python, simple to use, module to read information from a RPM file.
 '''
 
-try:
-    from cStringIO import StringIO
-except:
-    from StringIO import StringIO
-
 from collections import namedtuple
+import hashlib
+import re
 import stat
 import struct
-import re
-import hashlib
+import sys
+
+if sys.version < '3':
+    try:
+        from cStringIO import StringIO as BytesIO
+    except:
+        from StringIO import StringIO as BytesIO
+else:
+    from io import BytesIO
 
 
 class Entry(object):
@@ -68,7 +72,7 @@ class Entry(object):
         ''' store is a pointer to the store offset
         where the char should be read
         '''
-        return self._read_format('!{0:d}c'.format(data_count), store)
+        return self._read_format('!{0:d}s'.format(data_count), store)
 
     def _read_int8(self, store, data_count):
         ''' int8 = 1byte
@@ -93,12 +97,12 @@ class Entry(object):
     def _read_string(self, store, data_count):
         ''' read a string entry
         '''
-        string = ''
+        string = b''
         while True:
             char = self._read_char(store, 1)
-            if char[0] == '\x00':  # read until '\0'
+            if char == b'\x00':  # read until '\0'
                 break
-            string += char[0]
+            string += char
         return string.decode('utf-8')
 
     def _read_string_array(self, store, data_count):
@@ -115,8 +119,8 @@ class Entry(object):
 class HeaderBase(object):
 
     ''' RPM Header Structure '''
-    MAGIC_NUMBER = '\x8e\xad\xe8'
-    MAGIC_NUMBER_MATCHER = re.compile('(\x8e\xad\xe8)')
+    MAGIC_NUMBER = b'\x8e\xad\xe8'
+    MAGIC_NUMBER_MATCHER = re.compile(b'(\x8e\xad\xe8)')
 
     TAGS = {}
 
@@ -142,7 +146,7 @@ class HeaderBase(object):
 
             # read entries and store
             entries = [file.read(16) for i in range(header[3])]
-            store = StringIO(file.read(header[4]))
+            store = BytesIO(file.read(header[4]))
 
             # parse entries
             for entry in entries:
@@ -223,16 +227,16 @@ RPMprco = namedtuple("RPMprco", ['name', 'version', 'flags', 'str_flags'])
 
 
 class RPM(object):
-    RPM_LEAD_MAGIC_NUMBER = '\xed\xab\xee\xdb'
+    RPM_LEAD_MAGIC_NUMBER = b'\xed\xab\xee\xdb'
     RPM_PRCO_FLAGS_MAP = {0: None, 2: 'LT', 4: 'GT', 8: 'EQ', 10: 'LE', 12: 'GE'}
 
     def __init__(self, rpm):
-        ''' rpm - StringIO.StringIO | file
+        ''' rpm - StringIO.StringIO/io.BytesIO | file
         '''
         if hasattr(rpm, 'read'):  # if it walk like a duck..
             self.rpmfile = rpm
         else:
-            raise ValueError('invalid initialization: StringIO or file expected received %s' % (type(rpm), ))
+            raise ValueError('invalid initialization: StringIO/BytesIO or file expected received %s' % (type(rpm), ))
 
         self.binary = None
         self.source = None
