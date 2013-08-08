@@ -1,5 +1,5 @@
 =====
-PyRPM
+PyRPM .. image:: https://travis-ci.org/02strich/pyrpm.png   :target: https://travis-ci.org/02strich/pyrpm
 =====
 
 :authors: Stefan Richter, Mário Morgado
