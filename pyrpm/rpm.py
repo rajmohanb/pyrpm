@@ -1,6 +1,3 @@
-# -*- coding: iso-8859-15 -*-
-# -*- Mode: Python; py-ident-offset: 4 -*-
-# vim:ts=4:sw=4:et
 '''
 PyRPM
 =====
@@ -21,7 +18,6 @@ import hashlib
 
 
 class Entry(object):
-
     ''' RPM Header Entry '''
 
     def __init__(self, entry=None, store=None, tag=None, type=None, value=None):

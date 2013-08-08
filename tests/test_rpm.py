@@ -1,17 +1,9 @@
-# -*- coding: iso-8859-15 -*-
-# -*- Mode: Python; py-ident-offset: 4 -*-
-# vim:ts=4:sw=4:et
-'''
-High level pyrpm tests
-
-$Id$
-'''
-__revision__ = '$Rev$'[6:-2]
-
 import unittest
+from cStringIO import StringIO
+
 from pyrpm.rpm import RPM
 from pyrpm import rpmdefs
-from cStringIO import StringIO
+
 
 class RPMTest(unittest.TestCase):
 

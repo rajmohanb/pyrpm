@@ -44,12 +44,14 @@ if ElementTree.VERSION[0:3] == '1.2':
         return "%s%s" % (prefix, tag), xmlns
     ElementTree.fixtag = fixtag
 
+
 def register_namespace(name, ns):
     if ElementTree.VERSION[0:3] == '1.2':
         ElementTree._namespace_map[ns] = name if name else None
     else:
         #For etree > 1.3, use register_namespace function
         ElementTree.register_namespace(name, ns)
+
 
 class YumRepository(object):
 
@@ -66,9 +68,9 @@ class YumRepository(object):
 
         # read XML files
         for type, dictionary, node_filter, id_func in [
-            ('primary', self.primary_data, "{http://linux.duke.edu/metadata/common}package", lambda x: x.find('{http://linux.duke.edu/metadata/common}checksum[@pkgid="YES"]').text),
-            ('filelists', self.filelists_data, "{http://linux.duke.edu/metadata/filelists}package", lambda x: x.attrib['pkgid']),
-            ('other', self.other_data,"{http://linux.duke.edu/metadata/other}package", lambda x: x.attrib['pkgid'])]:
+                ('primary', self.primary_data, "{http://linux.duke.edu/metadata/common}package", lambda x: x.find('{http://linux.duke.edu/metadata/common}checksum[@pkgid="YES"]').text),
+                ('filelists', self.filelists_data, "{http://linux.duke.edu/metadata/filelists}package", lambda x: x.attrib['pkgid']),
+                ('other', self.other_data, "{http://linux.duke.edu/metadata/other}package", lambda x: x.attrib['pkgid'])]:
 
             # find location
             node = repomd_tree.find("{http://linux.duke.edu/metadata/repo}data[@type='" + type + "']")
@@ -80,18 +82,18 @@ class YumRepository(object):
 
     def save(self):
         # create XML files
-        primary_file, primary_file_gz       = self._create_meta(self.primary_data, '{http://linux.duke.edu/metadata/common}metadata', 'http://linux.duke.edu/metadata/common')
-        filelists_file, filelists_file_gz   = self._create_meta(self.filelists_data, '{http://linux.duke.edu/metadata/filelists}filelists', 'http://linux.duke.edu/metadata/filelists')
-        other_file, other_file_gz           = self._create_meta(self.other_data, '{http://linux.duke.edu/metadata/other}otherdata', 'http://linux.duke.edu/metadata/other')
+        primary_file, primary_file_gz = self._create_meta(self.primary_data, '{http://linux.duke.edu/metadata/common}metadata', 'http://linux.duke.edu/metadata/common')
+        filelists_file, filelists_file_gz = self._create_meta(self.filelists_data, '{http://linux.duke.edu/metadata/filelists}filelists', 'http://linux.duke.edu/metadata/filelists')
+        other_file, other_file_gz = self._create_meta(self.other_data, '{http://linux.duke.edu/metadata/other}otherdata', 'http://linux.duke.edu/metadata/other')
 
         # create repomd
         tree = ElementTree.ElementTree(ElementTree.Element("{http://linux.duke.edu/metadata/repo}repomd"))
 
         # compute file-stuff
         for type, file, file_gz, filename in [
-            ('primary', primary_file, primary_file_gz, 'repodata/primary.xml.gz'),
-            ('filelists', filelists_file, filelists_file_gz, 'repodata/filelists.xml.gz'),
-            ('other', other_file, other_file_gz, 'repodata/other.xml.gz')]:
+                ('primary', primary_file, primary_file_gz, 'repodata/primary.xml.gz'),
+                ('filelists', filelists_file, filelists_file_gz, 'repodata/filelists.xml.gz'),
+                ('other', other_file, other_file_gz, 'repodata/other.xml.gz')]:
 
             # compute file numbers (size, checksum)
             open_size = file.tell()
@@ -155,7 +157,6 @@ class YumRepository(object):
         # read package nodes
         for pkg_node in tree.findall(search_str):
             dictionary[id_func(pkg_node)] = pkg_node
-
 
     def _create_meta(self, list, root_tag, local_namespace):
         # create complete document

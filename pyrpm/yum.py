@@ -2,16 +2,15 @@ from xml.etree.ElementTree import Element
 
 from rpm import RPM
 
-# shorthand function for Element creation
-#################
+
 def element(tag, attrib={}, text=None):
+    """Helper function for Element creation"""
     ele = Element(tag, attrib)
-    if text: ele.text = text
+    if text:
+        ele.text = text
     return ele
 
-##################
-# Real classes
-#################
+
 class YumPackage(RPM):
     def _xml_base_items(self, ele):
         ele.append(element('{http://linux.duke.edu/metadata/common}name', text=self.header.name))
@@ -24,7 +23,7 @@ class YumPackage(RPM):
         ele.append(element('{http://linux.duke.edu/metadata/common}url', text=self.header.url))
         ele.append(element('{http://linux.duke.edu/metadata/common}time', {'file': str(self.header.build_time), 'build': str(self.header.build_time)}))
         ele.append(element('{http://linux.duke.edu/metadata/common}size', {'package': str(self.filesize), 'installed': str(sum([file.size for file in self.filelist])), 'archive': str(self.header.archive_size)}))
-        ele.append(element('{http://linux.duke.edu/metadata/common}location', {'href':self.canonical_filename}))
+        ele.append(element('{http://linux.duke.edu/metadata/common}location', {'href': self.canonical_filename}))
 
     def _xml_format_items(self, ele):
         ef = element('{http://linux.duke.edu/metadata/common}format')
@@ -42,7 +41,6 @@ class YumPackage(RPM):
 
         ele.append(ef)
 
-
     def _xml_pco(self, ele, pcotype):
         # get right pco
         mylist = getattr(self, pcotype)
@@ -54,7 +52,7 @@ class YumPackage(RPM):
             entry = element('{http://linux.duke.edu/metadata/rpm}entry', {'name': prco.name})
             if prco.str_flags:
                 entry.set('flags', prco.str_flags)
-                e,v,r = prco.version
+                e, v, r = prco.version
                 if e:
                     entry.set('epoch', str(e))
                 if v:
@@ -100,7 +98,7 @@ class YumPackage(RPM):
             entry = element('{http://linux.duke.edu/metadata/rpm}entry', {'name': prco.name})
             if prco.str_flags:
                 entry.set('flags', prco.str_flags)
-                e,v,r = prco.version
+                e, v, r = prco.version
                 if e:
                     entry.set('epoch', str(e))
                 if v:
@@ -116,7 +114,6 @@ class YumPackage(RPM):
         if used != 0:
             ele.append(ef)
 
-
     def _xml_changelog(self, ele, clog_limit=0):
         if not self.changelog:
             return ""
@@ -125,7 +122,6 @@ class YumPackage(RPM):
         clogs = self.changelog[:clog_limit] if clog_limit else self.changelog
         for changelog in clogs:
             ele.append(element('{http://linux.duke.edu/metadata/other}changelog', {'author': changelog.name, 'date': str(changelog.time)}, text=changelog.text))
-
 
     def xml_primary_metadata(self):
         ele = element("{http://linux.duke.edu/metadata/common}package", {'type': 'rpm'})
