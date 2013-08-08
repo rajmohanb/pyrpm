@@ -2,7 +2,6 @@ import unittest
 from cStringIO import StringIO
 
 from pyrpm.rpm import RPM
-from pyrpm import rpmdefs
 
 
 class RPMTest(unittest.TestCase):
@@ -10,31 +9,24 @@ class RPMTest(unittest.TestCase):
     def setUp(self):
 
         self.rpm = RPM(file('tests/Eterm-0.9.3-5mdv2007.0.src.rpm'))
-        self.rpm = StringIO('')
 
     def test_entries(self):
 
         description = '''Eterm is a color vt102 terminal emulator intended as a replacement for Xterm.\nIt is designed with a Freedom of Choice philosophy, leaving as much power,\nflexibility, and freedom as possible in the hands of the user.\n\nIt is designed to look good and work well, but takes a feature-rich approach\nrather than one of minimalism while still maintaining speed and efficiency.\n\nIt works on any windowmanager/desktop environment, although it is designed\nto work and integrate best with Enlightenment.'''
 
-        self.assertEqual(self.rpm[rpmdefs.RPMTAG_NAME], 'Eterm')
-        self.assertEqual(self.rpm[rpmdefs.RPMTAG_VERSION], '0.9.3')
-        self.assertEqual(self.rpm[rpmdefs.RPMTAG_RELEASE], '5mdv2007.0')
-        self.assertEqual(self.rpm[rpmdefs.RPMTAG_ARCH], 'i586')
-        self.assertEqual(self.rpm[rpmdefs.RPMTAG_COPYRIGHT], 'BSD')
-        self.assertEqual(self.rpm[rpmdefs.RPMTAG_DESCRIPTION], description)
+        self.assertEqual(self.rpm.header.name, 'Eterm')
+        self.assertEqual(self.rpm.header.version, '0.9.3')
+        self.assertEqual(self.rpm.header.release, '5mdv2007.0')
+        self.assertEqual(self.rpm.header.architecture, 'i586')
+        self.assertEqual(self.rpm.header.license, 'BSD')
+        self.assertEqual(self.rpm.header.description, description)
 
     def test_package_type(self):
         self.assertEqual(self.rpm.binary, False)
         self.assertEqual(self.rpm.source, True)
 
-    def test_name(self):
-        self.assertEqual(self.rpm.name(), 'Eterm')
-
-    def test_package(self):
-        self.assertEqual(self.rpm.package(), 'Eterm-0.9.3')
-
     def test_filename(self):
-        self.assertEqual(self.rpm.filename(), 'Eterm-0.9.3-5mdv2007.0.i586.src.rpm')
+        self.assertEqual(self.rpm.canonical_filename, 'Eterm-0.9.3-5mdv2007.0.src.rpm')
 
 
 class RPMStringIOTest(RPMTest):

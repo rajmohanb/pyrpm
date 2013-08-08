@@ -25,4 +25,5 @@ setup(name='pyrpm-02strich',
 
       packages=find_packages(where='.'),
       use_2to3=True,
+      test_suite="tests",
       )

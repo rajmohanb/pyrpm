@@ -255,9 +255,9 @@ class RPM(object):
     @property
     def canonical_filename(self):
         if self.header.epoch == 0:
-            return "%s-%s-%s.%s.rpm" % (self.header.name, self.header.version, self.header.release, self.header.architecture)
+            return "%s-%s-%s.%s.rpm" % (self.header.name, self.header.version, self.header.release, self.header.architecture if self.binary else "src")
         else:
-            return "%s-%s-%s-%d.%s.rpm" % (self.header.name, self.header.version, self.header.release, self.header.epoch, self.header.architecture)
+            return "%s-%s-%s-%d.%s.rpm" % (self.header.name, self.header.version, self.header.release, self.header.epoch, self.header.architecture if self.binary else "src")
 
     def _read_lead(self):
         ''' reads the rpm lead section
