@@ -354,7 +354,7 @@ class RPM(object):
                     language=self.header[1097][idx],
                     color=self.header[1140][idx] if 1140 in self.header else None,
                     content_class=self.header[1142][self.header[1141][idx]] if 1142 in self.header and 1141 in self.header else None,
-                    type='dir' if stat.S_ISDIR(self.header[1030][idx]) else ('ghost' if (self.header[1037][idx] & 64) else 'file'),
+                    type='dir' if stat.S_ISDIR(self.header[1030][idx] & 65535) else ('ghost' if (self.header[1037][idx] & 64) else 'file'),
                     primary=('bin/' in dirname or dirname.startswith('/etc/'))))
         except:
             pass

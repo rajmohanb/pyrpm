@@ -1,7 +1,7 @@
 from setuptools import setup, find_packages
 
 setup(name='pyrpm-02strich',
-      version='0.5.3',
+      version='0.5.4',
       description="A pure python rpm reader and YUM metadata generator",
       author="Stefan Richter",
       author_email="stefan@02strich.de",
