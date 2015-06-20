@@ -140,6 +140,7 @@ class HeaderBase(object):
         # read from file if possible
         if file:
             # read and check header
+            start = file.tell()
             header = struct.unpack('!3sc4sll', file.read(16))
             if header[0] != self.MAGIC_NUMBER:
                 raise RPMError('invalid RPM header')
@@ -155,6 +156,8 @@ class HeaderBase(object):
 
                 if object_entry:
                     self.entries.append(object_entry)
+            end = file.tell()
+            self.header_range = (start, end)
 
     def __getattr__(self, name):
         if name in self.TAGS:
