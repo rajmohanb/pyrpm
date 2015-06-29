@@ -140,6 +140,7 @@ class HeaderBase(object):
         # read from file if possible
         if file:
             # read and check header
+            start = file.tell()
             header = struct.unpack('!3sc4sll', file.read(16))
             if header[0] != self.MAGIC_NUMBER:
                 raise RPMError('invalid RPM header')
@@ -155,6 +156,8 @@ class HeaderBase(object):
 
                 if object_entry:
                     self.entries.append(object_entry)
+            end = file.tell()
+            self.header_range = (start, end)
 
     def __getattr__(self, name):
         if name in self.TAGS:
@@ -354,7 +357,7 @@ class RPM(object):
                     language=self.header[1097][idx],
                     color=self.header[1140][idx] if 1140 in self.header else None,
                     content_class=self.header[1142][self.header[1141][idx]] if 1142 in self.header and 1141 in self.header else None,
-                    type='dir' if stat.S_ISDIR(self.header[1030][idx]) else ('ghost' if (self.header[1037][idx] & 64) else 'file'),
+                    type='dir' if stat.S_ISDIR(self.header[1030][idx] & 65535) else ('ghost' if (self.header[1037][idx] & 64) else 'file'),
                     primary=('bin/' in dirname or dirname.startswith('/etc/'))))
         except:
             pass
