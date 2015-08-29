@@ -1,7 +1,11 @@
 from setuptools import setup, find_packages
 
-setup(name='pyrpm-02strich',
-      version='0.5.4',
+NAME = 'pyrpm-02strich'
+VERSION = '0.5.4'
+RELEASE = '2'
+
+setup(name=NAME,
+      version=VERSION,
       description="A pure python rpm reader and YUM metadata generator",
       author="Stefan Richter",
       author_email="stefan@02strich.de",
@@ -24,6 +28,15 @@ setup(name='pyrpm-02strich',
       ],
 
       packages=find_packages(where='.'),
+      options = {
+          'bdist_rpm':{
+              'build_requires':[
+                  'python',
+                  'python-setuptools',
+              ],
+              'release': RELEASE
+          },
+      },
       use_2to3=True,
       test_suite="tests",
       )
