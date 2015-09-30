@@ -103,7 +103,15 @@ class Entry(object):
             if char == b'\x00':  # read until '\0'
                 break
             string += char
-        return string.decode('utf-8')
+
+        # not all UTF-8 is valid and we should catch any errors processing those as ultimately
+        # a strange character is acceptable
+        try: 
+            returnstring = string.decode('utf-8')
+        except UnicodeError:
+            returnstring = string
+
+        return returnstring
 
     def _read_string_array(self, store, data_count):
         ''' read a array of string entries
