@@ -381,7 +381,11 @@ class RPM(object):
         # provides
         try:
             if self.header[1047]:
-                for name, flags, version in zip(self.header[1047], self.header[1112], self.header[1113]):
+                # Force provides flags to be itteratible by making a tuple if not itteratible
+                provides_flags = self.header[1112]
+                if not hasattr(provides_flags, '__iter__'):
+                    provides_flags = (provides_flags,)
+                for name, flags, version in zip(self.header[1047], provides_flags, self.header[1113]):
                     self.provides.append(
                         RPMprco(name=name, flags=flags, str_flags=self.RPM_PRCO_FLAGS_MAP[flags & 0xf], version=self._stringToVersion(version)))
         except:
