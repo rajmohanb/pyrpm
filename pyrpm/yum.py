@@ -1,8 +1,4 @@
-# First attempt to use the C backend if available if not fall back to python backend
-try:
-    from xml.etree.cElementTree import Element
-except:
-    from xml.etree.ElementTree import Element
+from xml.etree.ElementTree import Element
 
 from rpm import RPM
 
