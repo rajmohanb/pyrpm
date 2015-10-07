@@ -2,7 +2,10 @@ import gzip
 import hashlib
 import os
 import os.path
-from xml.etree import ElementTree
+try:
+    from xml.etree import cElementTree as ElementTree
+except:
+    from xml.etree import ElementTree
 
 # try to import the best StringIO
 from StringIO import StringIO

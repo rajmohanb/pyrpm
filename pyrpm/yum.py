@@ -1,4 +1,7 @@
-from xml.etree.ElementTree import Element
+try:
+    from xml.etree.cElementTree import Element
+except:
+    from xml.etree.ElementTree import Element
 
 from rpm import RPM
 
