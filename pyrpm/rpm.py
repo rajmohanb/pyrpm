@@ -227,7 +227,7 @@ class Header(HeaderBase):
     }
 
 
-class RPMError(BaseException):
+class RPMError(Exception):
     pass
 
 
