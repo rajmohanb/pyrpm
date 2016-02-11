@@ -106,10 +106,15 @@ class Entry(object):
 
         # not all UTF-8 is valid and we should catch any errors processing those as ultimately
         # a strange character is acceptable
-        try: 
+        try:
             returnstring = string.decode('utf-8')
         except UnicodeError:
-            returnstring = string
+            # if UTF-8 fails, give 8859-1 a try as it is the next most common
+            try:
+                returnstring = string.decode('iso-8859-1')
+            except UnicodeError:
+                # if both fail, keep the bytestring as strange characters are fine for most applications
+                returnstring = string
 
         return returnstring
 
