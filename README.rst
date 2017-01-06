@@ -13,7 +13,7 @@ Usage
 -----
 
         >>> from pyrpm.rpm import RPM
-        >>> rpm = RPM(file('package-1.0-r1.i586.rpm')
+        >>> rpm = RPM(open('package-1.0-r1.i586.rpm', 'rb') # make sure to open the file in binary mode
         >>> rpm.binary # this means that the package is a rpm and not a src.rpm
         True
         >>> rpm.header.name
@@ -22,4 +22,3 @@ Usage
         'i586'
         >>> rpm.header.description
         'package description'
-
